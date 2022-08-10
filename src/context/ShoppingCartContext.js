@@ -1,39 +1,83 @@
-import { createContext, useState } from "react";
+import { createContext, useState, useContext } from "react";
+import { AuthContext } from "./AuthContext";
 
 export const ShoppingCartContext = createContext();
 
 export const ShoppingCartProvider = ({ children }) => {
-  const [items, setItems] = useState(
-    JSON.parse(localStorage.getItem("movieapp.shoppingcart")) ?? []
-  );
+	const { user } = useContext(AuthContext);
+	const [items, setItems] = useState(
+		JSON.parse(localStorage.getItem("movieapp.shoppingcart")) ?? []
+	);
 
-  // que debemos guardar
-  //* obj pelicula
-  //* cantidad (como minimo 1)
+	function saveInCart(movie) {
+		const object = {
+			movie,
+			user_id: user.id,
+			quantity: 1,
+		};
 
-  function saveInCart(movie, user_id) {
-    const object = {
-      movie,
-      user_id,
-      quantity: 1,
-    };
+		items[items.length] = object;
+		setItems([...items]);
+		saveInLocalStorage(items);
+	}
 
-    //* estamos diciendo que object se guarde en items en la posicion 0
-    //* items[0] = object;
-    //* Entonces la segunda vez items.length = 1
-    //* items[1] = object;
-    items[items.length] = object;
-    setItems([...items]);
-    saveInLocalStorage(items);
-  }
+	function movieIsInCart(id) {
+		const movie = items.find(
+			(item) => item.movie.imdbID === id && item.user_id === user.id
+		);
+		return movie;
+	}
 
-  function saveInLocalStorage(items) {
-    localStorage.setItem("movieapp.shoppingcart", JSON.stringify(items));
-  }
+	function upOne(id) {
+		const movie = movieIsInCart(id);
+		if (movie === undefined) return;
+		if (movie.quantity >= 10) return;
+		const index = items.findIndex(
+			(item) => item.movie.imdbID === id && item.user_id === user.id
+		);
+		movie.quantity++;
+		items[index] = movie;
+		setItems([...items]);
+		saveInLocalStorage(items);
+	}
 
-  return (
-    <ShoppingCartContext.Provider value={{ items, saveInCart }}>
-      {children}
-    </ShoppingCartContext.Provider>
-  );
+	function downOne(id) {
+		const movie = movieIsInCart(id);
+		if (movie === undefined) return;
+		const index = items.findIndex(
+			(item) => item.movie.imdbID === id && item.user_id === user.id
+		);
+		if (movie.quantity < 2) {
+			items.splice(index, 1);
+		} else {
+			movie.quantity--;
+			items[index] = movie;
+		}
+		setItems([...items]);
+		saveInLocalStorage(items);
+	}
+
+	function cleanCart() {
+		setItems([]);
+		saveInLocalStorage([]);
+	}
+
+	function saveInLocalStorage(items) {
+		localStorage.setItem("movieapp.shoppingcart", JSON.stringify(items));
+	}
+
+	return (
+		<ShoppingCartContext.Provider
+			value={{
+				items,
+				saveInCart,
+				movieIsInCart,
+				upOne,
+				downOne,
+				cleanCart,
+			}}
+		>
+			{children}
+		</ShoppingCartContext.Provider>
+	);
 };
